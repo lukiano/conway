@@ -1,8 +1,6 @@
 package conway
 
 import cats.Comonad
-import cats.data.Validated
-import cats.instances.either.*
 
 given Alive[Boolean] with
     def isAlive(b: Boolean) = b == live
@@ -80,18 +78,44 @@ class LifeSuite extends munit.FunSuite:
   }
 
   test("command arguments have defaults and reject invalid values") {
-    type Result[A] = Either[WrongArgs, A]
-    assertEquals(Main.parseArgs[Result](Seq.empty), Right(Args(80, 100)))
-    assertEquals(Main.parseArgs[Result](Seq("4")), Right(Args(4, 100)))
-    assertEquals(Main.parseArgs[Result](Seq("0", "0")), Right(Args(0, 0)))
+    assertEquals(Main.command.parse(Seq.empty), Right((80, 100)))
+    assertEquals(Main.command.parse(Seq("4")), Right((4, 100)))
+    assertEquals(Main.command.parse(Seq("0", "0")), Right((0, 0)))
     for args <- Seq(Seq("-1"), Seq("x"), Seq("1", "-1"), Seq("2147483648"), Seq("1", "2", "3")) do
-      assert(Main.parseArgs[Result](args).isLeft)
+      assert(Main.command.parse(args).isLeft)
   }
 
-  test("argument parsing also supports Validated via ApplicativeError") {
-    type Result[A] = Validated[WrongArgs, A]
-    assertEquals(Main.parseArgs[Result](Seq.empty), Validated.valid[WrongArgs, Args](Args(80, 100)))
-    assertEquals(Main.parseArgs[Result](Seq("4", "0")), Validated.valid[WrongArgs, Args](Args(4, 0)))
-    for args <- Seq(Seq("-1"), Seq("x"), Seq("1", "-1"), Seq("2147483648"), Seq("1", "2", "3")) do
-      assert(Main.parseArgs[Result](args).isInvalid)
+  test("Decline reports validation errors and unexpected arguments") {
+    val cases = Seq(
+      Seq("-1") -> "Usage:",
+      Seq("1", "-1") -> "Usage:",
+      Seq("--", "-1") -> "Generations must be nonnegative",
+      Seq("--", "1", "-1") -> "Delay must be nonnegative",
+      Seq("x") -> "Usage:",
+      Seq("2147483648") -> "Usage:",
+      Seq("1", "2", "3") -> "Usage:",
+      Seq("--unknown") -> "Usage:"
+    )
+    for (args, message) <- cases do
+      Main.command.parse(args) match
+        case Left(error) =>
+          assert(error.errors.nonEmpty, error.toString)
+          assert(error.toString.contains(message), error.toString)
+        case Right(value) => fail(s"Expected a parsing error, got $value")
+  }
+
+  test("Decline accepts explicit values and the Int boundary") {
+    assertEquals(Main.command.parse(Seq("40", "150")), Right((40, 150)))
+    assertEquals(Main.command.parse(Seq(Int.MaxValue.toString)), Right((Int.MaxValue, 100)))
+  }
+
+  test("help requests produce generated usage without parsing errors") {
+    for flag <- Seq("--help", "-h") do
+      Main.command.parse(Seq(flag)) match
+        case Left(help) =>
+          assert(help.errors.isEmpty, help.toString)
+          assert(help.toString.contains("Usage:"), help.toString)
+          assert(help.toString.contains("generations"), help.toString)
+          assert(help.toString.contains("delayMillis"), help.toString)
+        case Right(value) => fail(s"Expected help, got $value")
   }

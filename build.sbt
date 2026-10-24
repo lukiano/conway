@@ -6,6 +6,7 @@ lazy val root = project.in(file(".")).settings(
   name := "conway",
   libraryDependencies ++= Seq(
     "org.typelevel" %% "cats-core" % "2.13.0",
+    "com.monovore" %% "decline" % "2.6.2",
     "org.scalameta" %% "munit" % "1.3.6" % Test
   ),
   scalacOptions ++= Seq("-deprecation", "-feature", "-unchecked"),
