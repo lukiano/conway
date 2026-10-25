@@ -1,6 +1,7 @@
 package conway
 
 import cats.Comonad
+import com.monovore.decline.Command
 
 given Alive[Boolean] with
     def isAlive(b: Boolean) = b == live
@@ -8,6 +9,7 @@ given Alive[Boolean] with
     val dead = false
 
 class LifeSuite extends munit.FunSuite:
+  private val command = Command("conway", "Conway's Game of Life", helpFlag = false)(Main.options)
   private def board(points: Set[(Int, Int)], size: Int = 6): Grid[Boolean] =
     Grid(Vector.tabulate(size, size)((y, x) => points.contains((x, y))))
 
@@ -78,11 +80,11 @@ class LifeSuite extends munit.FunSuite:
   }
 
   test("command arguments have defaults and reject invalid values") {
-    assertEquals(Main.command.parse(Seq.empty), Right((80, 100)))
-    assertEquals(Main.command.parse(Seq("4")), Right((4, 100)))
-    assertEquals(Main.command.parse(Seq("0", "0")), Right((0, 0)))
+    assertEquals(command.parse(Seq.empty), Right((80, 100)))
+    assertEquals(command.parse(Seq("4")), Right((4, 100)))
+    assertEquals(command.parse(Seq("0", "0")), Right((0, 0)))
     for args <- Seq(Seq("-1"), Seq("x"), Seq("1", "-1"), Seq("2147483648"), Seq("1", "2", "3")) do
-      assert(Main.command.parse(args).isLeft)
+      assert(command.parse(args).isLeft)
   }
 
   test("Decline reports validation errors and unexpected arguments") {
@@ -97,7 +99,7 @@ class LifeSuite extends munit.FunSuite:
       Seq("--unknown") -> "Usage:"
     )
     for (args, message) <- cases do
-      Main.command.parse(args) match
+      command.parse(args) match
         case Left(error) =>
           assert(error.errors.nonEmpty, error.toString)
           assert(error.toString.contains(message), error.toString)
@@ -105,13 +107,13 @@ class LifeSuite extends munit.FunSuite:
   }
 
   test("Decline accepts explicit values and the Int boundary") {
-    assertEquals(Main.command.parse(Seq("40", "150")), Right((40, 150)))
-    assertEquals(Main.command.parse(Seq(Int.MaxValue.toString)), Right((Int.MaxValue, 100)))
+    assertEquals(command.parse(Seq("40", "150")), Right((40, 150)))
+    assertEquals(command.parse(Seq(Int.MaxValue.toString)), Right((Int.MaxValue, 100)))
   }
 
   test("help requests produce generated usage without parsing errors") {
     for flag <- Seq("--help", "-h") do
-      Main.command.parse(Seq(flag)) match
+      command.parse(Seq(flag)) match
         case Left(help) =>
           assert(help.errors.isEmpty, help.toString)
           assert(help.toString.contains("Usage:"), help.toString)
