@@ -1,7 +1,8 @@
 package conway
 
 import cats.Show
-import cats.effect.{IO, Ref}
+import cats.syntax.all.*
+import cats.effect.{IO, Ref, Temporal}
 import cats.effect.std.Console
 import cats.effect.testkit.TestControl
 import cats.effect.unsafe.implicits.global
@@ -25,7 +26,8 @@ class SimulationSuite extends munit.FunSuite:
           IO.raiseError(new AssertionError(show.show(a)))
         def errorln[A](a: A)(using show: Show[A]): IO[Unit] = error(a)
 
-      val program = Simulation.run[IO](generations, delayMillis, clearScreen)
+      val config = SimulationConfig(generations, delayMillis, clearScreen, Game.glider[Organism](), Game.step)
+      val program = Simulation.run[IO, Grid[Organism]](config)
       for
         before <- output.get
         _ = assert(before.isEmpty)
@@ -62,4 +64,31 @@ class SimulationSuite extends munit.FunSuite:
       assertEquals(frames.size, 3)
       assertEquals(elapsed, Duration.Zero)
     }.unsafeToFuture()
+  }
+
+  test("a false Unit guard skips its effect and continues the comprehension") {
+    import Simulation.withFilter
+    val program = for
+      output <- Ref.of[IO, Vector[String]](Vector.empty)
+      start <- IO.monotonic
+      _ <- (IO.sleep(10.seconds) *> output.update(_ :+ "skipped"))
+      if false
+      _ <- output.update(_ :+ "continued")
+      end <- IO.monotonic
+      values <- output.get
+    yield
+      assertEquals(values, Vector("continued"))
+      assertEquals(end - start, Duration.Zero)
+    TestControl.executeEmbed(program).unsafeToFuture()
+  }
+
+  test("a true Unit guard runs its effect") {
+    import Simulation.withFilter
+    val program = for
+      start <- IO.monotonic
+      _ <- IO.sleep(1.second)
+      if true
+      end <- IO.monotonic
+    yield assertEquals(end - start, 1.second)
+    TestControl.executeEmbed(program).unsafeToFuture()
   }

@@ -22,8 +22,7 @@ object Main extends CommandIOApp(
 
   private def run(generations: Int, delayMillis: Int): IO[ExitCode] =
     for {
-      clearScreen = System.console() != null
-      _ <- Simulation.run[IO](generations, delayMillis, clearScreen)
+      _ <- Simulation.run[IO, Grid[Organism]](SimulationConfig(generations, delayMillis, System.console() != null, Game.glider(), Game.step))
     } yield ExitCode.Success
 
   override def main: Opts[IO[ExitCode]] =
