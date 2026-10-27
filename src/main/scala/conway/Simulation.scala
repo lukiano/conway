@@ -4,34 +4,30 @@ import cats.{Applicative, Show}
 import cats.effect.Temporal
 import cats.effect.std.Console
 import cats.syntax.all.*
+import fs2.Stream
 import scala.concurrent.duration.*
 
 
-case class SimulationConfig[B](
+case class SimulationConfig(
     generations: Int,
-    delayMillis: Int,
+    delay: FiniteDuration,
     clearScreen: Boolean,
-    initial: B,
-    next: B => B
 ) {
   val prefix = if clearScreen then "\u001b[H\u001b[2J" else ""
 }
 
-object Simulation:
-  extension [F[_]: Applicative](effect: F[Unit])
-    /** Gates this Unit effect before execution; subsequent effects still run. */
-    def withFilter(predicate: Unit => Boolean): F[Unit] =
-      effect.whenA(predicate(()))
-
-  private def display[F[_]: Console, T: Show](current: T, generation: Int, config: SimulationConfig[T]): F[Unit] =
+object Simulation:  
+  private def display[F[_]: Console, T: Show](current: T, generation: Long, config: SimulationConfig): F[Unit] =
     Console[F].println(s"${config.prefix}Generation $generation\n${current.show}\n")
 
-  private def loop[F[_]: Temporal: Console, T: Show](current: T, generation: Int, config: SimulationConfig[T]): F[Unit] =
-    for {
-      _ <- display(current, generation, config)
-      _ <- Temporal[F].sleep(config.delayMillis.millis) if config.delayMillis > 0 && generation < config.generations.toLong
-      _ <- loop(config.next(current), generation + 1, config) if generation < config.generations.toLong
-    } yield ()
+  private def delay[F[_]: Temporal](period: FiniteDuration): Stream[F, Unit] =
+    Stream.unit ++ Stream.fixedDelay(period)
 
-  def run[F[_]: Temporal: Console, B: Show](config: SimulationConfig[B]): F[Unit] =
-    loop(config.initial, 0, config)
+  def run[F[_]: Temporal: Console, B: Show](stream: Stream[F, B], config: SimulationConfig): F[Unit] =
+    delay(config.delay)
+      .zipRight(stream)
+      .zipWithIndex
+      .evalMap((current, generation) => display(current, generation, config))
+      .take(config.generations + 1)
+      .compile
+      .drain

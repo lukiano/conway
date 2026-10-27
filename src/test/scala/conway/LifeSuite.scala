@@ -2,6 +2,7 @@ package conway
 
 import cats.Comonad
 import com.monovore.decline.Command
+import scala.concurrent.duration.*
 
 given Alive[Boolean] with
     def isAlive(b: Boolean) = b == live
@@ -80,9 +81,9 @@ class LifeSuite extends munit.FunSuite:
   }
 
   test("command arguments have defaults and reject invalid values") {
-    assertEquals(command.parse(Seq.empty), Right((80, 100)))
-    assertEquals(command.parse(Seq("4")), Right((4, 100)))
-    assertEquals(command.parse(Seq("0", "0")), Right((0, 0)))
+    assertEquals(command.parse(Seq.empty), Right((80, 100.millis)))
+    assertEquals(command.parse(Seq("4")), Right((4, 100.millis)))
+    assertEquals(command.parse(Seq("0", "0 ms")), Right((0, 0.millis)))
     for args <- Seq(Seq("-1"), Seq("x"), Seq("1", "-1"), Seq("2147483648"), Seq("1", "2", "3")) do
       assert(command.parse(args).isLeft)
   }
@@ -92,7 +93,7 @@ class LifeSuite extends munit.FunSuite:
       Seq("-1") -> "Usage:",
       Seq("1", "-1") -> "Usage:",
       Seq("--", "-1") -> "Generations must be nonnegative",
-      Seq("--", "1", "-1") -> "Delay must be nonnegative",
+      Seq("--", "1", "-1 ms") -> "Delay must be nonnegative",
       Seq("x") -> "Usage:",
       Seq("2147483648") -> "Usage:",
       Seq("1", "2", "3") -> "Usage:",
@@ -107,8 +108,8 @@ class LifeSuite extends munit.FunSuite:
   }
 
   test("Decline accepts explicit values and the Int boundary") {
-    assertEquals(command.parse(Seq("40", "150")), Right((40, 150)))
-    assertEquals(command.parse(Seq(Int.MaxValue.toString)), Right((Int.MaxValue, 100)))
+    assertEquals(command.parse(Seq("40", "150 ms")), Right((40, 150.millis)))
+    assertEquals(command.parse(Seq(Int.MaxValue.toString)), Right((Int.MaxValue, 100.millis)))
   }
 
   test("help requests produce generated usage without parsing errors") {
@@ -118,6 +119,6 @@ class LifeSuite extends munit.FunSuite:
           assert(help.errors.isEmpty, help.toString)
           assert(help.toString.contains("Usage:"), help.toString)
           assert(help.toString.contains("generations"), help.toString)
-          assert(help.toString.contains("delayMillis"), help.toString)
+          assert(help.toString.contains("delay"), help.toString)
         case Right(value) => fail(s"Expected help, got $value")
   }

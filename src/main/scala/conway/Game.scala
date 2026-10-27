@@ -3,6 +3,8 @@ package conway
 import cats.Comonad
 import cats.syntax.coflatMap.*
 
+import fs2.Stream
+
 object Game:
   private val neighbors =
     for
@@ -27,3 +29,6 @@ object Game:
     require(width >= 3 && height >= 3, "glider needs at least a 3 by 3 grid")
     val seed = Set((1, 0), (2, 1), (0, 2), (1, 2), (2, 2))
     Grid(Vector.tabulate(height, width)((y, x) => if seed.contains(x, y) then tc.live else tc.dead ))
+
+  def stream[F[_], T : Alive]: fs2.Stream[F, Grid[T]] =
+    Stream.iterate(glider())(step)
