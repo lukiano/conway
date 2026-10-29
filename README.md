@@ -73,7 +73,7 @@ into `Opts[(Int, Int)]`. There are no custom argument or error types.
 Cats Effect runtime. `Main` checks whether a terminal is attached inside
 `IO.delay` and passes that flag to the simulation for screen clearing.
 
-`Simulation.scala` contains `run[F[_]: Temporal: Console]`, returning `F[Unit]`.
+`Simulation.scala` contains `run[F[_]: Temporal: Console]`, returning `ReaderT[F, SimulationConfig, Unit]`; supply the configuration with `.run(config)`.
 It has no dependency on concrete `IO`: output uses `Console[F]`, and delays
 use `Temporal[F].sleep`, which suspends the fiber without blocking a thread.
 The first frame is immediate and there is no delay after the last frame.

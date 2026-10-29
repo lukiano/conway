@@ -1,11 +1,14 @@
 package conway
 
 import cats.Show
-import cats.syntax.all.*
-import cats.effect.{IO, Ref, Temporal}
+import cats.effect.IO
+import cats.effect.Ref
+import cats.effect.Temporal
 import cats.effect.std.Console
 import cats.effect.testkit.TestControl
 import cats.effect.unsafe.implicits.global
+import cats.syntax.all.*
+import fs2.Stream
 import java.nio.charset.Charset
 import scala.concurrent.duration.*
 
@@ -26,8 +29,9 @@ class SimulationSuite extends munit.FunSuite:
           IO.raiseError(new AssertionError(show.show(a)))
         def errorln[A](a: A)(using show: Show[A]): IO[Unit] = error(a)
 
-      val config = SimulationConfig(generations, delayMillis.millis, clearScreen)
-      val program = Simulation.run(Game.stream[IO, Organism], config)
+      val config = Simulation.Config(generations, delayMillis.millis, clearScreen)
+      val stream = Stream.iterate[Simulation.Configured[IO], Grid[Organism]](Game.glider[Organism]())(_ coflatMap Game.rule)
+      val program = Simulation.run(stream).run(config)
       for
         before <- output.get
         _ = assert(before.isEmpty)
@@ -43,7 +47,7 @@ class SimulationSuite extends munit.FunSuite:
       assertEquals(frames.map(_._1), Vector(0.millis.toNanos.nanos, 100.millis.toNanos.nanos, 200.millis.toNanos.nanos))
       assertEquals(elapsed, 200.millis)
       val initial = Game.glider[Organism]()
-      val boards = Iterator.iterate(initial)(Game.step).take(3).toVector
+      val boards = Iterator.iterate(initial)(_ coflatMap Game.rule).take(3).toVector
       val expected = boards.zipWithIndex.map { (board, generation) =>
         s"Generation $generation\n${Show[Grid[Organism]].show(board)}\n\n"
       }

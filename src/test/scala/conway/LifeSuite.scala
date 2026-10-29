@@ -3,6 +3,7 @@ package conway
 import cats.Comonad
 import com.monovore.decline.Command
 import scala.concurrent.duration.*
+import cats.syntax.coflatMap.*
 
 given Alive[Boolean] with
     def isAlive(b: Boolean) = b == live
@@ -24,33 +25,33 @@ class LifeSuite extends munit.FunSuite:
 
   test("block is a still life") {
     val block = board(Set((2, 2), (2, 3), (3, 2), (3, 3)))
-    assertEquals(Game.step(block), block)
+    assertEquals(block coflatMap Game.rule, block)
   }
 
   test("blinker rotates, then returns after two simultaneous steps") {
     val horizontal = board(Set((1, 2), (2, 2), (3, 2)))
     val vertical = board(Set((2, 1), (2, 2), (2, 3)))
-    assertEquals(Game.step(horizontal), vertical)
-    assertEquals(Game.step(vertical), horizontal)
+    assertEquals(horizontal coflatMap Game.rule, vertical)
+    assertEquals(vertical coflatMap Game.rule, horizontal)
   }
 
   test("glider moves diagonally after four generations") {
     val initial = Game.glider(8, 8)
     val expected = Grid(Vector.tabulate(8, 8)((y, x) => initial.at(x - 1, y - 1)))
-    assertEquals(Iterator.iterate(initial)(Game.step).drop(4).next(), expected)
+    assertEquals(Iterator.iterate(initial)(_ coflatMap Game.rule).drop(4).next(), expected)
   }
 
   test("neighbors wrap across both edges") {
     val horizontal = board(Set((5, 0), (0, 0), (1, 0)))
     val vertical = board(Set((0, 5), (0, 0), (0, 1)))
-    assertEquals(Game.step(horizontal), vertical)
-    assertEquals(Game.step(vertical), horizontal)
+    assertEquals(horizontal coflatMap Game.rule, vertical)
+    assertEquals(vertical coflatMap Game.rule, horizontal)
   }
 
   test("empty and singleton populations die out") {
     val empty = board(Set.empty)
-    assertEquals(Game.step(empty), empty)
-    assertEquals(Game.step(board(Set((2, 2)))), empty)
+    assertEquals(empty coflatMap Game.rule, empty)
+    assertEquals(board(Set((2, 2))) coflatMap Game.rule, empty)
   }
 
   test("grid rejects empty, ragged, and invalid-focus inputs") {

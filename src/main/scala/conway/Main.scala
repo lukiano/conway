@@ -1,9 +1,11 @@
 package conway
 
-import cats.effect.{ExitCode, IO}
+import cats.effect.ExitCode
+import cats.effect.IO
 import cats.syntax.all.*
 import com.monovore.decline.Opts
 import com.monovore.decline.effect.CommandIOApp
+import fs2.Stream
 import scala.concurrent.duration.*
 
 object Main extends CommandIOApp(
@@ -11,7 +13,7 @@ object Main extends CommandIOApp(
   header = "Conway's Game of Life (defaults: 80 generations, 100 ms delay).",
   helpFlag = false
 ):
-  private[conway] val options: Opts[(Int, FiniteDuration)] =
+  private[conway] lazy val options: Opts[(Int, FiniteDuration)] =
     val generations = Opts.argument[Int]("generations")
       .withDefault(80)
       .validate("Generations must be nonnegative")(_ >= 0)
@@ -23,11 +25,9 @@ object Main extends CommandIOApp(
       .orElse((generations, delay).tupled)
 
   private def run(generations: Int, delay: FiniteDuration): IO[ExitCode] =
-    for {
-      config = SimulationConfig(generations, delay, System.console() != null)
-      stream = Game.stream[IO, Organism]
-      _ <- Simulation.run(stream, config)
-    } yield ExitCode.Success
+    val config = Simulation.Config(generations, delay, System.console() != null)
+    val stream = Stream.iterate[Simulation.Configured[IO], Grid[Organism]](Game.glider[Organism]())(_ coflatMap Game.rule)
+    Simulation.run(stream).run(config).as(ExitCode.Success)
 
   override def main: Opts[IO[ExitCode]] =
     options.map { run.tupled }

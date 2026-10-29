@@ -1,6 +1,7 @@
 package conway
 
-import cats.{ Comonad, Show }
+import cats.Comonad
+import cats.Show
 
 import cats.syntax.show.*
 

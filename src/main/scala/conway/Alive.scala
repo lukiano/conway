@@ -1,7 +1,5 @@
 package conway
 
-import cats.Monoid
-
 trait Alive[A] {
     def isAlive(a: A): Boolean
     def live: A
@@ -14,7 +12,7 @@ object Alive:
   extension [A](value: A)(using tc: Alive[A])
     def isAlive: Boolean = tc.isAlive(value)
 
-  given monoid[T](using tc: Alive[T]): Monoid[T] with
+  given monoid[T](using tc: Alive[T]): cats.Monoid[T] with
     def empty: T = Alive().live
 
     def combine(t1: T, t2: T): T =
